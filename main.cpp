@@ -12,6 +12,8 @@ const wchar_t* kWindowTitle = L"GUICounter";
 const wchar_t* kLogFileName = L"log.txt";
 
 HWND hTextArea;
+HFONT hFont;
+HMENU hMenu;
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -71,9 +73,16 @@ void DisplayFileDetails(const std::wstring& filePath) {
             contentStream << std::setw(4) << ++lineCount << L": " << line << L"\r\n";
         }
 
+        hFont = CreateFont(14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+            CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, TEXT("Arial"));
+
+        if (hFont) {
+            SendMessage(hTextArea, WM_SETFONT, WPARAM(hFont), TRUE);
+        }
+
         contentStream << L"\r\nFile information:\r\n";
         contentStream << L"\r\nFile Size: " << fs::file_size(filePath) << L" bytes\n";
-        contentStream << L"\r\nTotal Lines: \n" << lineCount;
+        contentStream << L"\r\nTotal Lines: " << lineCount;
 
         std::wstring content = contentStream.str();
 
@@ -85,19 +94,20 @@ void DisplayFileDetails(const std::wstring& filePath) {
     }
 }
 
-
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_CREATE: {
-        HWND hButton = CreateWindow(L"BUTTON", L"Open text file", WS_VISIBLE | WS_CHILD, 10, 10, 150, 40, hwnd, reinterpret_cast<HMENU>(1), NULL, NULL);
+        hMenu = CreateMenu();
+        HMENU hSubMenu = CreatePopupMenu();
+        AppendMenu(hSubMenu, MF_STRING, 1, L"Open Text File");
+        AppendMenu(hSubMenu, MF_STRING, 2, L"Visit GitHub");
+        AppendMenu(hSubMenu, MF_SEPARATOR, 0, NULL);
+        AppendMenu(hSubMenu, MF_STRING, 3, L"Exit");
+        AppendMenu(hMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(hSubMenu), L"File");
 
-        HMENU hContextMenu = CreatePopupMenu();
-        AppendMenu(hContextMenu, MF_STRING, 2, L"Open Folder");
-        AppendMenu(hContextMenu, MF_STRING, 3, L"Visit GitHub");
-        AppendMenu(hContextMenu, MF_SEPARATOR, 0, NULL);
-        AppendMenu(hContextMenu, MF_STRING, 4, L"Exit");
+        SetMenu(hwnd, hMenu);
 
-        SetMenu(hwnd, hContextMenu);
+        HWND hButton = CreateWindow(L"BUTTON", L"Open text file", WS_VISIBLE | WS_CHILD | BS_FLAT, 10, 0, 150, 40, hwnd, reinterpret_cast<HMENU>(1), NULL, NULL);
 
         hTextArea = CreateWindow(L"EDIT", L"", WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
             10, 60, 460, 190, hwnd, NULL, NULL, NULL);
@@ -106,7 +116,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
-        case 1: {
+   
+        case 1:
+        {
             OPENFILENAME ofn;
             wchar_t szFileName[MAX_PATH] = L"";
 
@@ -132,18 +144,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
         break;
         case 2:
-            OpenFolder(L".");
-            break;
-        case 3:
             OpenURL(L"https://github.com/FreddieCrew/guicounter");
             break;
-        case 4:
+        case 3:
             DestroyWindow(hwnd);
             break;
         }
         break;
     case WM_DESTROY:
-        DestroyMenu(GetMenu(hwnd));
+        if (hFont) {
+            DeleteObject(hFont);
+        }
+        DestroyMenu(hMenu);
         PostQuitMessage(0);
         break;
     default:
